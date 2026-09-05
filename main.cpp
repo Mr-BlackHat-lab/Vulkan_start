@@ -51,6 +51,15 @@ int main() {
     // Connect our application information to the instance creation info.
     createInfo.pApplicationInfo = &appInfo;
 
+    // ---------------------------------------------------------
+    // 10. Create Validation layer
+    // ---------------------------------------------------------
+
+    const char* validationLayer[] = {"VK_LAYER_KHRONOS_validation"};
+    createInfo.enabledLayerCount = 1;
+    createInfo.ppEnabledLayerNames = validationLayer;
+
+
 
     // Create the Vulkan instance.
     //
