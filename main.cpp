@@ -44,16 +44,20 @@ int main()
 
 
     // =========================================================
-    // 3. Validation Layer
+    // 3. Validation Layer & Instance Extensions
     // =========================================================
 
-    // Vulkan validation layer.
-    //
-    // The validation layer checks our Vulkan calls and reports
-    // mistakes, incorrect usage, missing requirements, etc.
     const char* validationLayers[] =
     {
         "VK_LAYER_KHRONOS_validation"
+    };
+
+    // NEW: The swapchain requires these instance extensions to exist first.
+    // VK_KHR_win32_surface is required because you are building an .exe on Windows.
+    const char* instanceExtensions[] =
+    {
+        "VK_KHR_surface",
+        "VK_KHR_win32_surface"
     };
 
 
@@ -63,18 +67,18 @@ int main()
 
     VkInstanceCreateInfo createInfo{};
 
-    // Specify the structure type.
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-
-    // Connect application information to instance creation.
     createInfo.pApplicationInfo = &appInfo;
 
-    // Enable validation layer.
+    // Enable validation layers
     createInfo.enabledLayerCount =
         static_cast<uint32_t>(std::size(validationLayers));
-
     createInfo.ppEnabledLayerNames = validationLayers;
 
+    // NEW: Enable the instance extensions
+    createInfo.enabledExtensionCount =
+        static_cast<uint32_t>(std::size(instanceExtensions));
+    createInfo.ppEnabledExtensionNames = instanceExtensions;
 
     // Create the Vulkan instance.
     VkResult result = vkCreateInstance(
