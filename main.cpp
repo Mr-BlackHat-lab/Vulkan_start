@@ -5,8 +5,22 @@
 
 #include <vulkan/vulkan.h>
 
-int main()
-{
+
+
+
+// callback functions for debug
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData){
+    std::cerr<< "Validation Layer: " << pCallbackData->pMessage << std::endl;
+
+    // Always return VK_FALSE, Returning VK_TRUE aborts the vulkan call.
+    return VK_FALSE;
+}
+
+int main() {
     // =========================================================
     // 1. Vulkan Instance
     // =========================================================
@@ -57,7 +71,8 @@ int main()
     const char* instanceExtensions[] =
     {
         "VK_KHR_surface",
-        "VK_KHR_win32_surface"
+        "VK_KHR_win32_surface",
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
 
@@ -79,6 +94,32 @@ int main()
     createInfo.enabledExtensionCount =
         static_cast<uint32_t>(std::size(instanceExtensions));
     createInfo.ppEnabledExtensionNames = instanceExtensions;
+
+
+
+    //New: set up the debug messenger callback
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+
+    debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+
+    // Specify which message severities you want to be notified about.
+    // (We usually skip the INFO bit so the console isn't flooded with spam).
+    debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    //Specify which types of message you want.
+    debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+
+    // connect the struct to the custom function you wrote at the top of the file.
+    debugCreateInfo.pfnUserCallback = debugCallback;
+
+    // Optional: I can pass a pointer to my own custom data here if needed.
+    debugCreateInfo.pUserData = nullptr;
+
+    // Finally, attach it to the instance creation info using the pNext pointer.
+    // this allow the debugger to catch errors during vkCreateInstance and vkDestroyInstance
+    createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
 
     // Create the Vulkan instance.
     VkResult result = vkCreateInstance(
