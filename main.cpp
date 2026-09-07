@@ -6,8 +6,6 @@
 #include <vulkan/vulkan.h>
 
 
-
-
 // callback functions for debug
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -28,7 +26,6 @@ int main() {
     // Handle to the Vulkan instance.
     // VK_NULL_HANDLE means it has not been created yet.
     VkInstance instance = VK_NULL_HANDLE;
-
 
     // =========================================================
     // 2. Application Information
@@ -95,9 +92,10 @@ int main() {
         static_cast<uint32_t>(std::size(instanceExtensions));
     createInfo.ppEnabledExtensionNames = instanceExtensions;
 
+    // =========================================================
+    // 21. set up the debug messenger callback
+    // =========================================================
 
-
-    //New: set up the debug messenger callback
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
     debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -139,6 +137,43 @@ int main() {
     std::cout << "Vulkan instance created successfully."
               << std::endl;
 
+    // =========================================================
+    // 22. Layer Verification by counting layers
+    // =========================================================
+
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    bool allLayersFound = true;
+
+
+    for (const char* layerName : validationLayers) {
+        bool layerFound = false;
+
+        for (const auto& layerProperties : availableLayers) {
+            if (strcmp(layerName, layerProperties.layerName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if (!layerFound) {
+            std::cout << "Failed to find Vulkan instance layer: " << layerName << std::endl;
+            allLayersFound = false;
+            break; // Missing a required layer, stop checking the rest
+        }
+    }
+
+    if (!allLayersFound) {
+        // Clean up the instance we just created before exiting
+        std::cout << "Failed to find Vulkan instance layer." <<std::endl;
+        vkDestroyInstance(instance, nullptr);
+        return EXIT_FAILURE;
+    }
 
     // =========================================================
     // 5. Find Physical Devices (GPUs)
