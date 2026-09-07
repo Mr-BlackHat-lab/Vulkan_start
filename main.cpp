@@ -1,252 +1,660 @@
 #include <iostream>
 #include <cstdlib>
-#include <vulkan/vulkan.h>
 #include <vector>
+#include <cstring>
 
-int main() {
+#include <vulkan/vulkan.h>
+
+int main()
+{
+    // =========================================================
+    // 1. Vulkan Instance
+    // =========================================================
 
     // Handle to the Vulkan instance.
-    // VK_NULL_HANDLE means it is not initialized yet.
+    // VK_NULL_HANDLE means it has not been created yet.
     VkInstance instance = VK_NULL_HANDLE;
 
 
-    // ---------------------------------------------------------
-    // 1. Application Information
-    // ---------------------------------------------------------
+    // =========================================================
+    // 2. Application Information
+    // =========================================================
 
-    // Describes information about our application.
-    // Vulkan uses this information internally and for debugging.
+    // This structure describes our application.
     VkApplicationInfo appInfo{};
 
-    // Specifies that this structure is a VkApplicationInfo structure.
+    // Specify the structure type.
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 
-    // Name of our application.
+    // Application name.
     appInfo.pApplicationName = "My Vulkan App";
 
-    // Version of our application.
+    // Application version.
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 
-    // Name of the game/graphics engine.
-    // We are not using an engine, so we just specify "No Engine".
+    // Engine name.
+    // We are not using an engine.
     appInfo.pEngineName = "No Engine";
 
-    // Version of the engine.
+    // Engine version.
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 
-    // Vulkan API version that our application wants to use.
+    // Vulkan API version requested by our application.
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
 
-    // ---------------------------------------------------------
-    // 2. Create Vulkan Instance
-    // ---------------------------------------------------------
+    // =========================================================
+    // 3. Validation Layer
+    // =========================================================
 
-    // Contains information required to create a Vulkan instance.
+    // Vulkan validation layer.
+    //
+    // The validation layer checks our Vulkan calls and reports
+    // mistakes, incorrect usage, missing requirements, etc.
+    const char* validationLayers[] =
+    {
+        "VK_LAYER_KHRONOS_validation"
+    };
+
+
+    // =========================================================
+    // 4. Create Vulkan Instance
+    // =========================================================
+
     VkInstanceCreateInfo createInfo{};
 
-    // Specifies that this structure is a VkInstanceCreateInfo.
+    // Specify the structure type.
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
-    // Connect our application information to the instance creation info.
+    // Connect application information to instance creation.
     createInfo.pApplicationInfo = &appInfo;
 
-    // ---------------------------------------------------------
-    // 10. Create Validation layer
-    // ---------------------------------------------------------
+    // Enable validation layer.
+    createInfo.enabledLayerCount =
+        static_cast<uint32_t>(std::size(validationLayers));
 
-    const char* validationLayer[] = {"VK_LAYER_KHRONOS_validation"};
-    createInfo.enabledLayerCount = 1;
-    createInfo.ppEnabledLayerNames = validationLayer;
-
+    createInfo.ppEnabledLayerNames = validationLayers;
 
 
     // Create the Vulkan instance.
-    //
-    // Parameters:
-    // 1. createInfo  -> information about how to create the instance
-    // 2. nullptr     -> no custom memory allocator
-    // 3. &instance   -> Vulkan will store the created instance here
-    //
-    // vkCreateInstance returns VK_SUCCESS when creation succeeds.
-    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+    VkResult result = vkCreateInstance(
+        &createInfo,
+        nullptr,
+        &instance
+    );
 
-        std::cout << "Failed to create Vulkan instance." << std::endl;
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to create Vulkan instance."
+                  << std::endl;
 
         return EXIT_FAILURE;
     }
 
+    std::cout << "Vulkan instance created successfully."
+              << std::endl;
 
-    // ---------------------------------------------------------
-    // 3. Find Number of Physical Devices (GPUs)
-    // ---------------------------------------------------------
 
-    // This variable will contain the number of Vulkan-compatible
-    // physical devices (GPUs) available on the system.
+    // =========================================================
+    // 5. Find Physical Devices (GPUs)
+    // =========================================================
+
     uint32_t deviceCount = 0;
 
-
     // First call:
-    // We don't provide an array of devices yet.
-    // Vulkan only tells us how many physical devices are available.
-    VkResult result = vkEnumeratePhysicalDevices(
-        instance,       // Vulkan instance
-        &deviceCount,   // Vulkan writes the number of devices here
-        nullptr         // nullptr means: don't retrieve devices yet
+    // Ask Vulkan how many physical devices are available.
+    result = vkEnumeratePhysicalDevices(
+        instance,
+        &deviceCount,
+        nullptr
     );
 
+    if (result != VK_SUCCESS || deviceCount == 0)
+    {
+        std::cout << "Failed to find Vulkan physical device."
+                  << std::endl;
 
-    // Check whether the function succeeded and whether
-    // at least one Vulkan-compatible GPU was found.
-    if (result != VK_SUCCESS || deviceCount == 0) {
-
-        std::cout << "Failed to find Vulkan device." << std::endl;
-
-        // Destroy the Vulkan instance before exiting.
         vkDestroyInstance(instance, nullptr);
 
         return EXIT_FAILURE;
     }
 
 
-    // ---------------------------------------------------------
-    // 4. Get the Physical Devices
-    // ---------------------------------------------------------
-
-    // Now that we know how many GPUs exist,
-    // create a vector large enough to store all of them.
-    //
-    // For example:
-    // deviceCount = 2
-    //
-    // physicalDevices[0] -> GPU 0
-    // physicalDevices[1] -> GPU 1
+    // Create a vector to store all physical devices.
     std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
 
 
     // Second call:
-    // This time we provide an array where Vulkan can store
-    // the physical device handles.
+    // Get the actual physical device handles.
     result = vkEnumeratePhysicalDevices(
-        instance,               // Vulkan instance
-        &deviceCount,           // Number of devices
-        physicalDevices.data()  // Array where devices are stored
+        instance,
+        &deviceCount,
+        physicalDevices.data()
     );
 
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to enumerate Vulkan devices."
+                  << std::endl;
 
-    // Check if retrieving the physical devices failed.
-    if (result != VK_SUCCESS) {
-
-        std::cout << "Failed to enumerate Vulkan devices." << std::endl;
-
-        // Clean up the Vulkan instance.
         vkDestroyInstance(instance, nullptr);
 
         return EXIT_FAILURE;
     }
 
 
-    // ---------------------------------------------------------
-    // 5. Select a Physical Device
-    // ---------------------------------------------------------
+    std::cout << "Number of Vulkan devices: "
+              << deviceCount
+              << std::endl;
 
-    // For now, simply select the first GPU in the list.
+
+    // =========================================================
+    // 6. Select Physical Device
+    // =========================================================
+
+    // For now, simply select the first GPU.
     //
-    // physicalDevices[0] is the first Vulkan-compatible GPU.
-    // Later, we can add logic to choose the best GPU.
-    VkPhysicalDevice physicalDevice = physicalDevices[0];
+    // Later, you can write code to select the best GPU
+    // based on GPU type, memory, features, etc.
+    VkPhysicalDevice physicalDevice =
+        physicalDevices[0];
 
 
-    // ---------------------------------------------------------
-    // 6. Get Physical Device Properties
-    // ---------------------------------------------------------
+    // =========================================================
+    // 7. Get Physical Device Properties
+    // =========================================================
 
-    // This structure will contain information about the GPU,
-    // such as:
-    //
-    // - GPU name
-    // - Vendor ID
-    // - Device ID
-    // - Driver version
-    // - Supported Vulkan versions
-    // - Various hardware limits
     VkPhysicalDeviceProperties deviceProperties{};
 
-
-    // Ask Vulkan for the properties of our selected GPU.
+    // Get information about the selected GPU.
     vkGetPhysicalDeviceProperties(
-        physicalDevice,     // GPU we want information about
-        &deviceProperties   // Vulkan writes the properties here
+        physicalDevice,
+        &deviceProperties
     );
 
 
-    // Print the GPU name.
+    // Print GPU name.
     std::cout << "Physical device: "
               << deviceProperties.deviceName
               << std::endl;
 
-    // ---------------------------------------------------------
-    //  7. Create Logical Device
-    // ---------------------------------------------------------
+    // Print Vulkan API version supported by the GPU.
+    std::cout << "Vulkan API version: "
+              << VK_VERSION_MAJOR(deviceProperties.apiVersion)
+              << "."
+              << VK_VERSION_MINOR(deviceProperties.apiVersion)
+              << "."
+              << VK_VERSION_PATCH(deviceProperties.apiVersion)
+              << std::endl;
 
-    // We need at least one queue to create a logical device.
-    // For simplicity, we just use the first available queue family.
-    float queuePriorities = 1.0f;
-    VkDeviceQueueCreateInfo queueCreateInfo{};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = 0;
-    queueCreateInfo.queueCount=1;
-    queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    //Describe the logical device we want to create
-    VkDeviceCreateInfo deviceCreateInfo{};
-    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceCreateInfo.queueCreateInfoCount = 1;
+    // =========================================================
+    // 8. Check Physical Device Features
+    // =========================================================
 
-    VkDevice device = VK_NULL_HANDLE;
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device)!= VK_SUCCESS) {
-        std::cout << "Failed to create logical device." << std::endl;
+    // This structure contains optional features supported by
+    // the physical device.
+    VkPhysicalDeviceFeatures deviceFeatures{};
+
+    vkGetPhysicalDeviceFeatures(
+        physicalDevice,
+        &deviceFeatures
+    );
+
+
+    // Check whether sampler anisotropy is supported.
+    //
+    // IMPORTANT:
+    //
+    // samplerAnisotropy is a FEATURE.
+    //
+    // It is NOT an extension.
+    //
+    // Therefore we check it separately from the swapchain
+    // extension.
+    if (deviceFeatures.samplerAnisotropy)
+    {
+        std::cout << "Sampler anisotropy: supported"
+                  << std::endl;
+    }
+    else
+    {
+        std::cout << "Sampler anisotropy: not supported"
+                  << std::endl;
+    }
+
+
+    // =========================================================
+    // 9. Check Device Extensions
+    // =========================================================
+
+    // Extensions required by our application.
+    //
+    // VK_KHR_swapchain is normally required when creating
+    // a presentation swapchain.
+    const std::vector<const char*> deviceExtensions =
+    {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
+
+    // Get number of available device extensions.
+    uint32_t extensionCount = 0;
+
+    result = vkEnumerateDeviceExtensionProperties(
+        physicalDevice,
+        nullptr,
+        &extensionCount,
+        nullptr
+    );
+
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to get device extension count."
+                  << std::endl;
+
         vkDestroyInstance(instance, nullptr);
+
         return EXIT_FAILURE;
     }
 
-    // ---------------------------------------------------------
-    // 8. Create and Destroy Vulkan Buffer
-    // ---------------------------------------------------------
 
-    // Define the buffer size (e.g., 1024 bytes)
-    VkDeviceSize bufferSize = 1024;
+    // Create vector to store available extensions.
+    std::vector<VkExtensionProperties> availableExtensions(
+        extensionCount
+    );
 
-    VkBufferCreateInfo bufferInfo={};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = bufferSize;
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VkBuffer vertexBuffer = VK_NULL_HANDLE;
-    if (vkCreateBuffer(device, &bufferInfo,nullptr,&vertexBuffer)!= VK_SUCCESS) {
-        //handle buffer creation failure
-        std::cout << "Failed to create vertex buffer." << std::endl;
-    } else {
-        std::cout << "Succesfully created vertex buffer of size: " << bufferSize << std::endl;
+    // Get all available extensions.
+    result = vkEnumerateDeviceExtensionProperties(
+        physicalDevice,
+        nullptr,
+        &extensionCount,
+        availableExtensions.data()
+    );
+
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to enumerate device extensions."
+                  << std::endl;
+
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
     }
 
 
-    // Destroying a Vulkan buffer
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-
-    // ---------------------------------------------------------
-    // 9. Clean up Device and Instance
-    // ---------------------------------------------------------
-
-    // Destroy logical device first
-    vkDestroyDevice(device, nullptr);
-
-    // Then destroy instance
-    vkDestroyInstance(instance, nullptr);
+    // Assume all required extensions are supported.
+    bool allExtensionsSupported = true;
 
 
-    // Program finished successfully.
+    // Check every extension that our application requires.
+    for (const char* requiredExtension : deviceExtensions)
+    {
+        bool extensionFound = false;
+
+        // Compare required extension against every
+        // extension supported by the physical device.
+        for (const auto& availableExtension : availableExtensions)
+        {
+            if (std::strcmp(
+                    requiredExtension,
+                    availableExtension.extensionName) == 0)
+            {
+                extensionFound = true;
+                break;
+            }
+        }
+
+
+        // Extension was not found.
+        if (!extensionFound)
+        {
+            std::cout << "Missing device extension: "
+                      << requiredExtension
+                      << std::endl;
+
+            allExtensionsSupported = false;
+        }
+        else
+        {
+            std::cout << "Device extension supported: "
+                      << requiredExtension
+                      << std::endl;
+        }
+    }
+
+
+    // If a required extension is missing, stop.
+    if (!allExtensionsSupported)
+    {
+        std::cout << "Required device extensions are not supported."
+                  << std::endl;
+
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
+    }
+
+
+    // =========================================================
+    // 10. Find Queue Family
+    // =========================================================
+
+    // Vulkan devices contain one or more queue families.
+    //
+    // We need a queue capable of graphics operations.
+    uint32_t queueFamilyCount = 0;
+
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        physicalDevice,
+        &queueFamilyCount,
+        nullptr
+    );
+
+
+    // Store queue family information.
+    std::vector<VkQueueFamilyProperties> queueFamilies(
+        queueFamilyCount
+    );
+
+
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        physicalDevice,
+        &queueFamilyCount,
+        queueFamilies.data()
+    );
+
+
+    // UINT32_MAX means that we haven't found a suitable
+    // queue family yet.
+    uint32_t graphicsQueueFamily = UINT32_MAX;
+
+
+    // Search for a queue family supporting graphics.
+    for (uint32_t i = 0; i < queueFamilyCount; ++i)
+    {
+        if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        {
+            graphicsQueueFamily = i;
+
+            std::cout << "Graphics queue family found: "
+                      << i
+                      << std::endl;
+
+            break;
+        }
+    }
+
+
+    // Check whether a graphics queue was found.
+    if (graphicsQueueFamily == UINT32_MAX)
+    {
+        std::cout << "Failed to find graphics queue family."
+                  << std::endl;
+
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
+    }
+
+
+    // =========================================================
+    // 11. Create Queue
+    // =========================================================
+
+    // Queue priority.
+    //
+    // Range:
+    // 0.0 = lowest priority
+    // 1.0 = highest priority
+    float queuePriority = 1.0f;
+
+
+    // Information about the queue we want.
+    VkDeviceQueueCreateInfo queueCreateInfo{};
+
+    queueCreateInfo.sType =
+        VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+
+    // Queue family that contains our graphics queue.
+    queueCreateInfo.queueFamilyIndex =
+        graphicsQueueFamily;
+
+    // Number of queues we want from this family.
+    queueCreateInfo.queueCount = 1;
+
+    // Pointer to queue priority.
+    queueCreateInfo.pQueuePriorities =
+        &queuePriority;
+
+
+    // =========================================================
+    // 12. Create Logical Device
+    // =========================================================
+
+    VkDeviceCreateInfo deviceCreateInfo{};
+
+    deviceCreateInfo.sType =
+        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+
+    // Tell Vulkan which queue(s) we want.
+    deviceCreateInfo.queueCreateInfoCount = 1;
+
+    deviceCreateInfo.pQueueCreateInfos =
+        &queueCreateInfo;
+
+
+    // Enable the physical device features that we want.
+    //
+    // Here we enable sampler anisotropy only if the GPU
+    // actually supports it.
+    if (deviceFeatures.samplerAnisotropy)
+    {
+        deviceCreateInfo.pEnabledFeatures =
+            &deviceFeatures;
+    }
+    else
+    {
+        // No optional features requested.
+        deviceCreateInfo.pEnabledFeatures = nullptr;
+    }
+
+
+    // Enable required device extensions.
+    deviceCreateInfo.enabledExtensionCount =
+        static_cast<uint32_t>(deviceExtensions.size());
+
+    deviceCreateInfo.ppEnabledExtensionNames =
+        deviceExtensions.data();
+
+
+    // =========================================================
+    // 13. Create Logical Device
+    // =========================================================
+
+    VkDevice device = VK_NULL_HANDLE;
+
+    result = vkCreateDevice(
+        physicalDevice,
+        &deviceCreateInfo,
+        nullptr,
+        &device
+    );
+
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to create logical device."
+                  << std::endl;
+
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Logical device created successfully."
+              << std::endl;
+
+
+    // =========================================================
+    // 14. Get Graphics Queue
+    // =========================================================
+
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+
+    // Get the queue from the logical device.
+    vkGetDeviceQueue(
+        device,
+        graphicsQueueFamily,
+        0,
+        &graphicsQueue
+    );
+
+
+    if (graphicsQueue == VK_NULL_HANDLE)
+    {
+        std::cout << "Failed to get graphics queue."
+                  << std::endl;
+
+        vkDestroyDevice(device, nullptr);
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Graphics queue obtained successfully."
+              << std::endl;
+
+
+    // =========================================================
+    // 15. Create Vulkan Buffer
+    // =========================================================
+
+    // Size of our buffer.
+    VkDeviceSize bufferSize = 1024;
+
+
+    // Describe the buffer we want to create.
+    VkBufferCreateInfo bufferInfo{};
+
+    bufferInfo.sType =
+        VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+
+    // Size of the buffer.
+    bufferInfo.size = bufferSize;
+
+    // Tell Vulkan how we intend to use this buffer.
+    //
+    // Here we want to use it as a vertex buffer.
+    bufferInfo.usage =
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+    // Only one queue family will access this buffer.
+    bufferInfo.sharingMode =
+        VK_SHARING_MODE_EXCLUSIVE;
+
+
+    // Handle to the buffer.
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+
+
+    // Create the buffer.
+    result = vkCreateBuffer(
+        device,
+        &bufferInfo,
+        nullptr,
+        &vertexBuffer
+    );
+
+
+    if (result != VK_SUCCESS)
+    {
+        std::cout << "Failed to create vertex buffer."
+                  << std::endl;
+
+        vkDestroyDevice(device, nullptr);
+        vkDestroyInstance(instance, nullptr);
+
+        return EXIT_FAILURE;
+    }
+
+
+    std::cout << "Successfully created vertex buffer."
+              << std::endl;
+
+    std::cout << "Buffer size: "
+              << bufferSize
+              << " bytes"
+              << std::endl;
+
+
+    // =========================================================
+    // 16. Get Buffer Memory Requirements
+    // =========================================================
+
+    // IMPORTANT:
+    //
+    // vkCreateBuffer() creates the BUFFER OBJECT.
+    //
+    // It does NOT allocate GPU memory for the buffer.
+    //
+    // To actually use the buffer, we would normally call:
+    //
+    // vkGetBufferMemoryRequirements()
+    // vkAllocateMemory()
+    // vkBindBufferMemory()
+    //
+    // We are stopping before those steps here because this
+    // example is focused on instance, device, extension,
+    // queue and buffer creation.
+
+
+    // =========================================================
+    // 17. Destroy Buffer
+    // =========================================================
+
+    vkDestroyBuffer(
+        device,
+        vertexBuffer,
+        nullptr
+    );
+
+    std::cout << "Vertex buffer destroyed."
+              << std::endl;
+
+
+    // =========================================================
+    // 18. Destroy Logical Device
+    // =========================================================
+
+    // The logical device must be destroyed before the
+    // Vulkan instance.
+    vkDestroyDevice(
+        device,
+        nullptr
+    );
+
+    std::cout << "Logical device destroyed."
+              << std::endl;
+
+
+    // =========================================================
+    // 19. Destroy Vulkan Instance
+    // =========================================================
+
+    vkDestroyInstance(
+        instance,
+        nullptr
+    );
+
+    std::cout << "Vulkan instance destroyed."
+              << std::endl;
+
+
+    // =========================================================
+    // 20. Program Finished
+    // =========================================================
+
     return EXIT_SUCCESS;
 }
